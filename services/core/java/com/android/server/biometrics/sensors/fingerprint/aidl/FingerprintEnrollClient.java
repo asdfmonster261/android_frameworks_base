@@ -84,6 +84,10 @@ public class FingerprintEnrollClient extends EnrollClient<AidlSession> implement
     private final int mMaxTemplatesPerUser;
     private boolean mIsPointerDown;
 
+    // Some side-mounted HALs pause enrollment once a run of captures adds nothing new, and
+    // wait to be resumed. Null on every HAL that does not do this, which is most of them.
+    @Nullable private SidefpsExtension mSidefpsExtension;
+
     private static boolean shouldVibrateFor(Context context,
             FingerprintSensorPropertiesInternal sensorProps) {
         if (sensorProps != null) {
@@ -147,6 +151,14 @@ public class FingerprintEnrollClient extends EnrollClient<AidlSession> implement
     public void onEnrollResult(BiometricAuthenticator.Identifier identifier, int remaining) {
         super.onEnrollResult(identifier, remaining);
 
+        if (mSidefpsExtension != null) {
+            if (remaining == 0) {
+                mSidefpsExtension.stop();
+            } else {
+                mSidefpsExtension.onProgress();
+            }
+        }
+
         mSensorOverlays.ifUdfps(
                 controller -> controller.onEnrollmentProgress(getSensorId(), remaining));
 
@@ -199,6 +211,14 @@ public class FingerprintEnrollClient extends EnrollClient<AidlSession> implement
             }
         });
         mCallback.onBiometricAction(BiometricStateListener.ACTION_SENSOR_TOUCH);
+
+        // A HAL that pauses enrollment goes silent, so the capture that ends up unmatched is
+        // the last thing seen until something resumes it. Arm on every capture and let the
+        // enrollment result, which follows immediately when the capture counted, disarm it.
+        if (mSidefpsExtension != null && acquiredInfo != FINGERPRINT_ACQUIRED_START) {
+            mSidefpsExtension.onAcquired();
+        }
+
         super.onAcquired(acquiredInfo, vendorCode);
     }
 
@@ -210,6 +230,10 @@ public class FingerprintEnrollClient extends EnrollClient<AidlSession> implement
                 getErrorString(getContext(), errorCode, vendorCode), errorCode).build()
         );
         super.onError(errorCode, vendorCode);
+
+        if (mSidefpsExtension != null) {
+            mSidefpsExtension.stop();
+        }
 
         mSensorOverlays.hide(getSensorId());
         mAuthenticationStateListeners.onAuthenticationStopped(
@@ -234,6 +258,9 @@ public class FingerprintEnrollClient extends EnrollClient<AidlSession> implement
         );
 
         BiometricNotificationUtils.cancelBadCalibrationNotification(getContext());
+
+        mSidefpsExtension = SidefpsExtension.get("default");
+
         try {
             doEnroll();
         } catch (RemoteException e) {
