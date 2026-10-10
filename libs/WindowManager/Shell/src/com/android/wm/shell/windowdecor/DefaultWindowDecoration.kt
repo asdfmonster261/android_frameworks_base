@@ -491,7 +491,14 @@ constructor(
                 isPinnedLayer -> CaptionController.CaptionType.APP_PINNED
                 taskInfo.isFreeform -> CaptionController.CaptionType.APP_HEADER
                 isFullscreenDesktop(taskInfo) -> CaptionController.CaptionType.FULLSCREEN_HEADER
-                else -> CaptionController.CaptionType.APP_HANDLE
+                // Decorations for all tasks hands every fullscreen task an app handle
+                // without asking the display.
+                else -> if (DesktopExperienceFlags.ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS.isTrue &&
+                    !desktopState.isDesktopModeSupportedOnDisplay(taskInfo.displayId)) {
+                    CaptionController.CaptionType.NO_CAPTION
+                } else {
+                    CaptionController.CaptionType.APP_HANDLE
+                }
             }
         val isAppHeader = captionType == CaptionController.CaptionType.APP_HEADER
         val isAppHandle = captionType == CaptionController.CaptionType.APP_HANDLE
