@@ -161,7 +161,10 @@ public class DesktopModeStatus {
             return true;
         }
         if (display.getType() == Display.TYPE_INTERNAL) {
-            return canInternalDisplayHostDesktops(context);
+            // A fold's cover panel is an internal display too.
+            return canInternalDisplayHostDesktops(context)
+                    && display.getMinSizeDimensionDp()
+                            >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP;
         }
 
         // TODO (b/395014779): Change this to use WM API
