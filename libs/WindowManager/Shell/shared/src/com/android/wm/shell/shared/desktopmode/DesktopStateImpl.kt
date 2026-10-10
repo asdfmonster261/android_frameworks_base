@@ -106,7 +106,11 @@ class DesktopStateImpl(context: Context) : DesktopState {
     override fun isDesktopModeSupportedOnDisplay(display: Display): Boolean {
         if (!canEnterDesktopMode) return false
         if (!enforceDeviceRestrictions) return true
-        if (display.type == Display.TYPE_INTERNAL) return canInternalDisplayHostDesktops
+        if (display.type == Display.TYPE_INTERNAL) {
+            // A fold's cover panel is an internal display too.
+            return canInternalDisplayHostDesktops &&
+                display.minSizeDimensionDp >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+        }
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue) return false
         return windowManager?.isEligibleForDesktopMode(display.displayId) ?: false
     }
